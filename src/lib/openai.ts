@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 import { isSupabaseConfigured } from './supabase';
 import { DEFAULT_SECTION } from './constants';
 
-const openai_key = import.meta.env.VITE_SUPABASE_URL;
+const openai_key = import.meta.env.VITE_OPENAI_API_KEY;
 const openaiClient = new OpenAI({
   apiKey: openai_key,
   dangerouslyAllowBrowser: true

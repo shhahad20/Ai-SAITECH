@@ -17,7 +17,7 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onUpload }) => {
   const [activeView, setActiveView] = useState<'users' | 'verification' | 'metrics' | 'documents'>('users');
   const [users, setUsers] = useState<User[]>([]);
-  const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
+  // const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,17 +29,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onUpload }) => {
     try {
       setIsLoading(true);
       setError(null);
-
-      // First check if current user is admin
+  
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (!currentUser) throw new Error('Authentication required');
-
-      const { data: currentUserData } = await supabase
+        
+      const { data: currentUserData, error: profileError } = await supabase
         .from('users')
         .select('is_admin')
         .eq('id', currentUser.id)
         .single();
-
+        // .timeout(5000); // Add timeout
+  
+      if (profileError) throw profileError;
       if (!currentUserData?.is_admin) {
         throw new Error('Admin privileges required');
       }
@@ -54,13 +55,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onUpload }) => {
       setUsers(userData || []);
 
       // Fetch verification requests
-      const { data: verificationData, error: verificationError } = await supabase
-        .from('verification_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // const { data: verificationData, error: verificationError } = await supabase
+      //   .from('verification_requests')
+      //   .select('*')
+      //   .order('created_at', { ascending: false });
 
-      if (verificationError) throw verificationError;
-      setVerificationRequests(verificationData || []);
+      // if (verificationError) throw verificationError;
+      // setVerificationRequests(verificationData || []);
 
     } catch (err) {
       console.error('Error loading dashboard data:', err);
@@ -141,12 +142,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onUpload }) => {
             onRefresh={loadDashboardData} 
           />
         )}
-        {activeView === 'verification' && (
+        {/* {activeView === 'verification' && (
           <VerificationQueue 
             requests={verificationRequests}
             onRefresh={loadDashboardData}
           />
-        )}
+        )} */}
         {activeView === 'metrics' && (
           <UserMetrics users={users} />
         )}

@@ -1,8 +1,8 @@
-import { supabase } from './supabase';
-import { analyzeDocument } from './openai';
-import type { Document, DocumentMetadata } from '../types';
-import mammoth from 'mammoth';
-import { isSupabaseConfigured } from './supabase';
+import { supabase } from "./supabase";
+import { analyzeDocument } from "./openai";
+import type { Document, DocumentMetadata } from "../types";
+import mammoth from "mammoth";
+import { isSupabaseConfigured } from "./supabase";
 
 // Constants for text processing
 const CHUNK_SIZE = 3000;
@@ -15,26 +15,28 @@ interface DocumentAnalysis {
   summary: string;
 }
 
-async function analyzeDocumentContent(content: string): Promise<DocumentAnalysis> {
+async function analyzeDocumentContent(
+  content: string
+): Promise<DocumentAnalysis> {
   try {
     const analysis = await analyzeDocument(content);
     return JSON.parse(analysis);
   } catch (error) {
-    console.error('Error analyzing document content:', error);
+    console.error("Error analyzing document content:", error);
     return {
       topics: [],
       concepts: [],
       tags: [],
-      summary: 'Analysis failed'
+      summary: "Analysis failed",
     };
   }
 }
 
 function sanitizeContent(content: string): string {
   return content
-    .replace(/\u0000/g, '')
-    .replace(/[\uFFFD\uFFFE\uFFFF]/g, '')
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+    .replace(/\u0000/g, "")
+    .replace(/[\uFFFD\uFFFE\uFFFF]/g, "")
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "")
     .trim();
 }
 
@@ -45,150 +47,191 @@ async function extractTextFromDocx(file: File): Promise<string> {
       reader.onload = async (e) => {
         try {
           if (!e.target?.result) {
-            throw new Error('Failed to read file content');
+            throw new Error("Failed to read file content");
           }
           const arrayBuffer = e.target.result as ArrayBuffer;
           const result = await mammoth.extractRawText({ arrayBuffer });
           if (!result.value) {
-            throw new Error('Failed to extract text from document');
+            throw new Error("Failed to extract text from document");
           }
           resolve(result.value);
         } catch (error) {
-          reject(error instanceof Error ? error : new Error('Failed to process DOCX file'));
+          reject(
+            error instanceof Error
+              ? error
+              : new Error("Failed to process DOCX file")
+          );
         }
       };
-      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.onerror = () => reject(new Error("Failed to read file"));
       reader.readAsArrayBuffer(file);
     });
   } catch (error) {
-    throw error instanceof Error ? error : new Error('Failed to process DOCX file');
+    throw error instanceof Error
+      ? error
+      : new Error("Failed to process DOCX file");
   }
 }
 
 export async function uploadDocument(
-  name: string, 
-  file: File, 
+  name: string,
+  file: File,
   sectionId: string,
   isUniversal: boolean = false
 ): Promise<Document> {
+  // Validate Supabase connection
   if (!isSupabaseConfigured()) {
-    throw new Error('Please connect to Supabase first using the "Connect to Supabase" button in the top right corner.');
+    throw new Error(
+      'Please connect to Supabase first using the "Connect to Supabase" button.'
+    );
   }
 
+  // Authentication check
   const {
     data: { user },
     error: authError,
   } = await supabase.auth.getUser();
-
   if (authError || !user) {
-    throw new Error('You must be logged in to upload documents');
+    throw new Error("You must be logged in to upload documents");
   }
 
+  // Admin check for universal docs
   if (isUniversal) {
     const { data: userData } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
+      .from("users")
+      .select("is_admin")
+      .eq("id", user.id)
       .single();
 
     if (!userData?.is_admin) {
-      throw new Error('Only administrators can upload universal documents');
+      throw new Error("Only administrators can upload universal documents");
     }
   }
+  const { data: sectionData } = await supabase
+    .from("document_sections")
+    .select("id")
+    .eq("name", "fms-policies")
+    .single();
+
+  if (!sectionData) {
+    throw new Error("Section not found");
+  }
+  sectionId = sectionData.id;
+  console.log(sectionId);
 
   try {
+    // File validation
+    if (!file) throw new Error("No file provided");
+    if (file.size === 0) throw new Error("File is empty");
+    if (file.size > 20 * 1024 * 1024)
+      throw new Error("File size must be less than 20MB");
+
+    // File type handling
     let content: string;
-    
-    if (!file) {
-      throw new Error('No file provided');
-    }
-
-    if (file.size === 0) {
-      throw new Error('File is empty');
-    }
-
-    if (file.size > 20 * 1024 * 1024) {
-      throw new Error('File size must be less than 20MB');
-    }
-    
     const fileType = name.toLowerCase();
-    if (fileType.endsWith('.docx')) {
+
+    if (fileType.endsWith(".docx")) {
       content = await extractTextFromDocx(file);
-    } else if (fileType.endsWith('.txt')) {
+    } else if (fileType.endsWith(".txt")) {
       content = await file.text();
     } else {
-      throw new Error('Unsupported file type. Please upload a .docx or .txt file.');
+      throw new Error("Unsupported file type. Please upload .docx or .txt");
     }
 
-    if (!content || content.trim().length === 0) {
-      throw new Error('Document appears to be empty');
-    }
-
+    // Content validation
+    if (!content?.trim()) throw new Error("Document appears empty");
     const sanitizedContent = sanitizeContent(content);
+    if (!sanitizedContent.length) throw new Error("No valid text content");
 
-    if (sanitizedContent.length === 0) {
-      throw new Error('Document contains no valid text content');
+    // Document analysis
+    let metadata: DocumentMetadata;
+    try {
+      const analysis = await analyzeDocumentContent(sanitizedContent);
+      if (!analysis?.summary) {
+        throw new Error("Analysis returned invalid data");
+      }
+
+      metadata = {
+        topics: analysis.topics || [],
+        concepts: analysis.concepts || [],
+        tags: analysis.tags || [],
+        summary: analysis.summary || "",
+        lastUpdated: new Date().toISOString(),
+        section: sectionId,
+      };
+    } catch (analysisError) {
+      console.error("Analysis failed:", sanitizedContent);
+      throw new Error(
+        `Document analysis failed: ${(analysisError as Error).message}`
+      );
     }
 
-    // Analyze document content
-    const analysis = await analyzeDocumentContent(sanitizedContent);
-    
-    // Create document metadata
-    const metadata: DocumentMetadata = {
-      topics: analysis.topics || [],
-      concepts: analysis.concepts || [],
-      tags: analysis.tags || [],
-      summary: analysis.summary || '',
-      lastUpdated: new Date().toISOString(),
-      section: sectionId
-    };
+    console.log(sectionId);
+    // Database insertion
+    const { data: result, error: fnError } = await supabase.rpc(
+      "manage_document",
+      {
+        p_action: "create",
+        p_name: sanitizeContent(name),
+        p_content: sanitizedContent,
+        p_section_id: sectionId,
+        p_is_universal: isUniversal,
+        p_topics: metadata.topics,
+        p_concepts: metadata.concepts,
+        p_tags: metadata.tags,
+        p_user_id: user.id,
+        p_summary: metadata.summary,
+      }
+    );
 
-    // Use the manage_document function to create the document
-    const { data: result, error: fnError } = await supabase.rpc('manage_document', {
-      p_action: 'create',
-      p_name: sanitizeContent(name),
-      p_content: sanitizedContent,
-      p_section_id: sectionId,
-      p_is_universal: isUniversal
-    });
-
-    if (fnError) {
-      console.error('Document upload error:', fnError);
-      throw new Error('Failed to upload document to database');
+    if (fnError || !result?.[0]?.id) {
+      console.error("Database error:", fnError);
+      throw new Error("Failed to create document record");
     }
 
-    // Get the created document
+    // Retrieve created document
     const { data: document, error: docError } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('id', result.id)
+      .from("documents")
+      .select("*")
+      .eq("id", result[0].id)
       .single();
 
     if (docError || !document) {
-      throw new Error('Failed to retrieve created document');
+      throw new Error("Failed to retrieve created document");
     }
 
-    // Create audit log entry
-    await supabase.from('document_audit_logs').insert({
-      document_id: document.id,
-      action: 'create',
-      user_id: user.id,
-      version: 1,
-      changes: 'Initial document creation'
-    });
+    // Create audit log
+    const { error: auditError } = await supabase
+      .from("document_audit_logs")
+      .insert({
+        document_id: document.id,
+        action: "create",
+        user_id: user.id,
+        version: 1,
+        changes: JSON.stringify({
+          name: document.name,
+          metadata: metadata,
+        }),
+      });
+
+    if (auditError) {
+      console.warn("Audit log error:", auditError);
+    }
 
     return document as Document;
   } catch (error) {
-    console.error('Error processing document:', error);
-    throw error instanceof Error 
-      ? error 
-      : new Error('Failed to process document. Please try again.');
+    console.error("Upload process failed:", error);
+    throw error instanceof Error
+      ? error
+      : new Error("Document processing failed");
   }
 }
 
 export async function getDocuments(): Promise<Document[]> {
   if (!isSupabaseConfigured()) {
-    throw new Error('Please connect to Supabase first using the "Connect to Supabase" button in the top right corner.');
+    throw new Error(
+      'Please connect to Supabase first using the "Connect to Supabase" button in the top right corner.'
+    );
   }
 
   const {
@@ -197,33 +240,36 @@ export async function getDocuments(): Promise<Document[]> {
   } = await supabase.auth.getUser();
 
   if (authError) {
-    throw new Error('Authentication error');
+    throw new Error("Authentication error");
   }
 
   try {
     const { data: documents, error } = await supabase
-      .from('documents')
-      .select('*')
-      .or(`user_id.eq.${user?.id},is_universal.eq.true`)
-      .order('created_at', { ascending: false });
+      .from("documents")
+      .select("*")
+      // .or(`user_id.eq.${user?.id},is_universal.eq.true`)
+      .or(`user_id.eq.${user?.id}`)
+      .order("created_at", { ascending: false });
 
     if (error) {
-      console.error('Error fetching documents:', error);
-      throw new Error('Failed to fetch documents');
+      console.error("Error fetching documents:", error);
+      throw new Error("Failed to fetch documents");
     }
 
     return documents as Document[];
   } catch (error) {
-    console.error('Error fetching documents:', error);
-    throw error instanceof Error 
-      ? error 
-      : new Error('Failed to fetch documents. Please try again.');
+    console.error("Error fetching documents:", error);
+    throw error instanceof Error
+      ? error
+      : new Error("Failed to fetch documents. Please try again.");
   }
 }
 
 export async function deleteDocument(id: string): Promise<void> {
   if (!isSupabaseConfigured()) {
-    throw new Error('Please connect to Supabase first using the "Connect to Supabase" button in the top right corner.');
+    throw new Error(
+      'Please connect to Supabase first using the "Connect to Supabase" button in the top right corner.'
+    );
   }
 
   const {
@@ -232,17 +278,17 @@ export async function deleteDocument(id: string): Promise<void> {
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    throw new Error('Authentication required');
+    throw new Error("Authentication required");
   }
 
   // Use the manage_document function to delete the document
-  const { error: fnError } = await supabase.rpc('manage_document', {
-    p_action: 'delete',
-    p_document_id: id
+  const { error: fnError } = await supabase.rpc("manage_document", {
+    p_action: "delete",
+    p_document_id: id,
   });
 
   if (fnError) {
-    console.error('Error deleting document:', fnError);
-    throw new Error('Failed to delete document');
+    console.error("Error deleting document:", fnError);
+    throw new Error("Failed to delete document");
   }
 }
