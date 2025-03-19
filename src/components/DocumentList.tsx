@@ -16,10 +16,10 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   onViewHistory,
   activeSection
 }) => {
-  // Filter documents by active section if provided
-  const filteredDocuments = activeSection
-    ? documents.filter(doc => doc.section_id === activeSection)
-    : documents;
+// In DocumentList component
+const filteredDocuments = activeSection
+  ? documents.filter(doc => doc.section_id === activeSection)
+  : documents;
 
   const getSectionName = (sectionId: string) => {
     return Object.values(DOCUMENT_SECTIONS).find(section => section.id === sectionId)?.name || 'Unknown Section';

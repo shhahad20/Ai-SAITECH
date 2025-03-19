@@ -2,22 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   Users, Shield, Activity, Globe, 
-  Download, Search, Filter, MoreVertical 
+  // Download, Search, Filter, MoreVertical 
 } from 'lucide-react';
 import { UserList } from './admin/UserList';
-import { VerificationQueue } from './admin/VerificationQueue';
+// import { VerificationQueue } from './admin/VerificationQueue';
 import { UserMetrics } from './admin/UserMetrics';
 import { FileUpload } from './FileUpload';
-import type { User, VerificationRequest } from '../types';
+import type { User, /*VerificationRequest,*/ Document } from '../types';
 
 interface AdminDashboardProps {
-  onUpload: (files: File[], isUniversal: boolean) => void;
+  // onUpload: (files: File[], sectionId: string, isUniversal: boolean) => void;
+  onUploadSuccess: (document: Document) => void;
+  onUploadError: (error: string) => void;
+  documents: Document[];
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onUpload }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
+  // onUpload,
+  // documents 
+  onUploadSuccess,
+  onUploadError,
+  // documents 
+}) => {
   const [activeView, setActiveView] = useState<'users' | 'verification' | 'metrics' | 'documents'>('users');
   const [users, setUsers] = useState<User[]>([]);
-  // const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,14 +41,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onUpload }) => {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (!currentUser) throw new Error('Authentication required');
         
-      const { data: currentUserData, error: profileError } = await supabase
+      const { data: currentUserData } = await supabase
         .from('users')
         .select('is_admin')
         .eq('id', currentUser.id)
         .single();
-        // .timeout(5000); // Add timeout
-  
-      if (profileError) throw profileError;
+
       if (!currentUserData?.is_admin) {
         throw new Error('Admin privileges required');
       }
@@ -53,15 +59,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onUpload }) => {
 
       if (userError) throw userError;
       setUsers(userData || []);
-
-      // Fetch verification requests
-      // const { data: verificationData, error: verificationError } = await supabase
-      //   .from('verification_requests')
-      //   .select('*')
-      //   .order('created_at', { ascending: false });
-
-      // if (verificationError) throw verificationError;
-      // setVerificationRequests(verificationData || []);
 
     } catch (err) {
       console.error('Error loading dashboard data:', err);
@@ -103,16 +100,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onUpload }) => {
           User Management
         </button>
         <button
-          onClick={() => setActiveView('verification')}
-          className={`flex items-center gap-2 w-full rounded-lg py-2.5 text-sm font-medium leading-5
-            ${activeView === 'verification'
-              ? 'bg-gray-700 text-white shadow'
-              : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'}`}
-        >
-          <Shield className="w-4 h-4" />
-          Verification Queue
-        </button>
-        <button
           onClick={() => setActiveView('metrics')}
           className={`flex items-center gap-2 w-full rounded-lg py-2.5 text-sm font-medium leading-5
             ${activeView === 'metrics'
@@ -130,7 +117,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onUpload }) => {
               : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'}`}
         >
           <Globe className="w-4 h-4" />
-          Documents
+          Document Management
         </button>
       </div>
 
@@ -142,12 +129,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onUpload }) => {
             onRefresh={loadDashboardData} 
           />
         )}
-        {/* {activeView === 'verification' && (
-          <VerificationQueue 
-            requests={verificationRequests}
-            onRefresh={loadDashboardData}
-          />
-        )} */}
         {activeView === 'metrics' && (
           <UserMetrics users={users} />
         )}
@@ -155,14 +136,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onUpload }) => {
           <div className="space-y-6">
             <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
               <Globe className="w-5 h-5 text-blue-400" />
-              Universal Documents
+              Document Upload
             </h2>
             <FileUpload
               accept={{
                 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
                 'text/plain': ['.txt'],
               }}
-              onUpload={(files) => onUpload(files, true)}
+              onUploadSuccess={onUploadSuccess}
+              onError={onUploadError}
               isAdmin={true}
             />
           </div>

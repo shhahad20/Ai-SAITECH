@@ -1,6 +1,6 @@
 export const DOCUMENT_SECTIONS = {
   FMS_POLICIES: {
-    id: 'fms-policies',
+    id: '03ae9ecc-87b5-4245-bdb5-a14aebdb2167',
     name: 'FMS Policies & Procedures',
     description: 'Facility Management System policies and procedures documentation'
   },

@@ -107,17 +107,18 @@ export async function uploadDocument(
       throw new Error("Only administrators can upload universal documents");
     }
   }
+
+  console.log(sectionId + " From Document")
   const { data: sectionData } = await supabase
-    .from("document_sections")
+    .from("sections")
     .select("id")
-    .eq("name", "fms-policies")
+    .eq("id", sectionId)
     .single();
 
   if (!sectionData) {
     throw new Error("Section not found");
   }
   sectionId = sectionData.id;
-  console.log(sectionId);
 
   try {
     // File validation

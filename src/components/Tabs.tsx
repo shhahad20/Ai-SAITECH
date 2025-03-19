@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '../lib/utils';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { useDocumentSections } from '../lib/sections';
 
 interface SubTab {
   id: string;
@@ -15,19 +16,42 @@ interface Tab {
 }
 
 interface TabsProps {
-  tabs: Tab[];
   activeTab: string;
   activeSubTab?: string;
   onTabChange: (tab: string, subTab?: string) => void;
 }
 
 export const Tabs: React.FC<TabsProps> = ({ 
-  tabs, 
   activeTab, 
   activeSubTab,
   onTabChange 
 }) => {
+  const { sections, loading, error } = useDocumentSections();
   const [expandedTabs, setExpandedTabs] = React.useState<Set<string>>(new Set([activeTab]));
+
+  const tabs: Tab[] = [
+    {
+      id: 'governance',
+      name: 'Governance',
+      subTabs: sections.map(section => ({
+        id: section.id,
+        name: section.name,
+        description: section.description
+      }))
+    },
+    {
+      id: 'faq',
+      name: 'FAQ'
+    },
+    {
+      id: 'data-analysis',
+      name: 'Data Analysis'
+    },
+    {
+      id: 'admin',
+      name: 'Admin'
+    }
+  ];
 
   const toggleExpand = (tabId: string) => {
     const newExpanded = new Set(expandedTabs);
@@ -38,6 +62,24 @@ export const Tabs: React.FC<TabsProps> = ({
     }
     setExpandedTabs(newExpanded);
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {Array(4).fill(0).map((_, i) => (
+          <div key={i} className="h-10 bg-gray-700 rounded-lg animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 text-red-400 text-sm">
+        Error loading sections: {error}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">
