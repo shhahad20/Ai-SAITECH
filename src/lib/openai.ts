@@ -26,16 +26,15 @@ export async function getAIResponse(
     );
   }
   const { data: sectionData } = await supabase
-    .from("sections")
+    .from("sub_sections")
     .select("id")
-    .eq("name", sectionId)
+    .eq("id", sectionId)
     .single();
 
   if (!sectionData) {
     throw new Error("Section not found");
   }
   sectionId = sectionData.id;
-  console.log(sectionId);
   try {
     if (!question.trim()) {
       throw new Error("No question provided");

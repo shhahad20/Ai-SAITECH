@@ -10,7 +10,26 @@ export interface Answer {
   source: string;
   confidence: number;
 }
+export interface Section {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  created_at?: Date;
+  updated_at?: Date;
+  sub_sections?: SubSection[];
+}
 
+export interface SubSection {
+  id: string;
+  name: string;
+  section_id: string;
+  slug: string;
+  description?: string;
+  created_at?: Date;
+  updated_at?: Date;
+
+}
 // export interface Message {
 //   id: string;
 //   role: 'user' | 'assistant';
@@ -85,7 +104,7 @@ export interface VerificationRequest {
   user_id: string;
   user_email: string;
   status: 'pending' | 'approved' | 'rejected';
-  verification_data: Record<string, any>;
+  verification_data: Record<string, null>;
   admin_note?: string;
   created_at: string;
   verified_at?: string;

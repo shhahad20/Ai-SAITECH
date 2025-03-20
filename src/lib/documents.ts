@@ -110,7 +110,7 @@ export async function uploadDocument(
 
   console.log(sectionId + " From Document")
   const { data: sectionData } = await supabase
-    .from("sections")
+    .from("sub_sections")
     .select("id")
     .eq("id", sectionId)
     .single();
