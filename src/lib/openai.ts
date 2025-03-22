@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { supabase } from "./supabase";
 import { isSupabaseConfigured } from "./supabase";
-import { DEFAULT_SECTION } from "./constants";
+// import { DEFAULT_SECTION } from "./constants";
 
 const openai_key = import.meta.env.VITE_OPENAI_API_KEY;
 const openaiClient = new OpenAI({
@@ -25,19 +25,30 @@ export async function getAIResponse(
       'Please connect to Supabase first using the "Connect to Supabase" button in the top right corner.'
     );
   }
-  const { data: sectionData } = await supabase
-    .from("sub_sections")
-    .select("id")
-    .eq("id", sectionId)
-    .single();
+  // const { data: sectionData } = await supabase
+  //   .from("sub_sections")
+  //   .select("id")
+  //   .eq("id", sectionId)
+  //   .single();
 
-  if (!sectionData) {
-    throw new Error("Section not found");
-  }
-  sectionId = sectionData.id;
+  // if (!sectionData) {
+  //   throw new Error("Section not found");
+  // }
+  // sectionId = sectionData.id;
+  // console.log(sectionId)
   try {
     if (!question.trim()) {
       throw new Error("No question provided");
+    }
+
+    // Validate sectionId as UUID format
+    if (
+      sectionId &&
+      !/^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/.test(
+        sectionId
+      )
+    ) {
+      throw new Error("Invalid section ID format");
     }
 
     let targetDocument;
@@ -58,15 +69,19 @@ export async function getAIResponse(
       targetDocument = document;
     } else {
       // For new questions, search across documents in the specified section
-      const { data: documents, error } = await supabase
+      // Handle new question with section filter
+      const query = supabase
         .from("documents")
-        .select("id, content, name, section_id")
-        .eq("section_id", sectionId || DEFAULT_SECTION);
+        .select("id, content, name, section_id");
+
+      if (sectionId) {
+        query.eq("section_id", sectionId);
+      }
+
+      const { data: documents, error } = await query;
 
       if (error) throw error;
-      if (!documents || documents.length === 0) {
-        return null;
-      }
+      if (!documents?.length) return null;
 
       // Create a prompt to find relevant documents
       const completion = await openaiClient.chat.completions.create({

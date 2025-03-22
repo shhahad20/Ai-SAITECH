@@ -19,7 +19,8 @@ import { useTabStructure } from '../lib/sections';
 interface TabsProps {
   activeTab: string;
   activeSubTab?: string;
-  onTabChange: (tab: string, subTab?: string) => void;
+  // onTabChange: (tab: string, subTab?: string) => void;
+  onTabChange: (tabId: string, subTabId?: string) => void;
 }
 // Define explicit types for the tab structure
 interface TabItem {

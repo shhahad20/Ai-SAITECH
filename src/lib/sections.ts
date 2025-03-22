@@ -177,10 +177,10 @@ export const useTabStructure = () => {
   const { sections, loading, error } = useNavigation();
 
   const tabs = sections.map(section => ({
-    id: section.slug,
+    id: section.id,
     name: section.name,
     subTabs: section.sub_sections?.map(sub => ({
-      id: sub.slug,
+      id: sub.id,
       name: sub.name,
       description: sub.description
     })) || []

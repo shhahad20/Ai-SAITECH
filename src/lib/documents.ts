@@ -5,8 +5,8 @@ import mammoth from "mammoth";
 import { isSupabaseConfigured } from "./supabase";
 
 // Constants for text processing
-const CHUNK_SIZE = 3000;
-const CHUNK_OVERLAP = 200;
+// const CHUNK_SIZE = 3000;
+// const CHUNK_OVERLAP = 200;
 
 interface DocumentAnalysis {
   topics: string[];
@@ -108,7 +108,7 @@ export async function uploadDocument(
     }
   }
 
-  console.log(sectionId + " From Document")
+  console.log(sectionId + " From Document");
   const { data: sectionData } = await supabase
     .from("sub_sections")
     .select("id")
@@ -267,29 +267,93 @@ export async function getDocuments(): Promise<Document[]> {
 }
 
 export async function deleteDocument(id: string): Promise<void> {
+  try {
+    if (!isSupabaseConfigured()) {
+      throw new Error(
+        'Supabase connection required - use the "Connect to Supabase" button'
+      );
+    }
+
+    // Verify authentication
+    // Authentication check
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error("You must be logged in to upload documents");
+    }
+
+    // First create audit log
+    const { error: auditError } = await supabase
+      .from("document_audit_logs")
+      .insert({
+        document_id: id,
+        action: "delete",
+        user_id: user.id,
+        changes: {
+          deleted_by: user.id,
+          deletion_attempt_at: new Date().toISOString(),
+        },
+      });
+    if (auditError) {
+      console.error("Audit log creation failed:", auditError);
+      throw new Error("Failed to create deletion audit record");
+    }
+
+    // Attempt deletion
+    const { error: deleteError } = await supabase
+      .from("documents")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      console.error("Database deletion error:", {
+        error: deleteError,
+        documentId: id,
+        userId: user.id,
+      });
+      throw new Error("Failed to delete document from database");
+    }
+
+    // console.log("Document deleted and audited successfully:", {
+    //   documentId: id,
+    // });
+  } catch (error) {
+    console.error("Document deletion process failed:", {
+      error,
+      documentId: id,
+      timestamp: new Date().toISOString(),
+    });
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Document deletion failed due to an unexpected error";
+
+    throw new Error(message);
+  }
+}
+// Add to your documents.ts file
+export async function updateDocument(
+  id: string,
+  updates: Partial<Document>
+): Promise<Document> {
   if (!isSupabaseConfigured()) {
-    throw new Error(
-      'Please connect to Supabase first using the "Connect to Supabase" button in the top right corner.'
-    );
+    throw new Error("Supabase connection required");
   }
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from("documents")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
 
-  if (authError || !user) {
-    throw new Error("Authentication required");
+  if (error) {
+    console.error("Update error:", error);
+    throw new Error("Failed to update document");
   }
 
-  // Use the manage_document function to delete the document
-  const { error: fnError } = await supabase.rpc("manage_document", {
-    p_action: "delete",
-    p_document_id: id,
-  });
-
-  if (fnError) {
-    console.error("Error deleting document:", fnError);
-    throw new Error("Failed to delete document");
-  }
+  return data as Document;
 }

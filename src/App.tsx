@@ -124,11 +124,34 @@ function App() {
     }));
   };
 
-  const handleTabChange = (tab: string, subTab?: string) => {
-    setActiveTab(tab);
-    setActiveSubTab(subTab || DEFAULT_SECTION);
+  // const handleTabChange = (tab: string, subTab?: string) => {
+  //   setActiveTab(tab);
+  //   setActiveSubTab(subTab || DEFAULT_SECTION);
+  // };
+  const handleTabChange = async (tab: string, subTab?: string) => {
+    try {
+      let subTabId = '';
+      
+      if (subTab) {
+        // Get the actual sub-section ID from the slug
+        const { data: subSection } = await supabase
+          .from('sub_sections')
+          .select('id')
+          .eq('id', subTab)
+          .single();
+  
+        if (!subSection) throw new Error('Sub-section not found');
+        subTabId = subSection.id;
+      }
+  
+      console.log(activeTab)
+      setActiveTab(tab);
+      setActiveSubTab(subTabId || DEFAULT_SECTION);
+    } catch (error) {
+      console.error("Error changing tab:", error);
+      setError(error instanceof Error ? error.message : "Failed to change section");
+    }
   };
-
   const startNewChat = () => {
     setChatSession({
       messages: [],
@@ -181,13 +204,14 @@ function App() {
     setError(null);
 
     try {
+      console.log(activeSubTab)
       const response = await getAIResponse(
         content,
         chatSession.activeDocumentId,
         activeSubTab,
         !chatSession.isNewChat
       );
-
+      
       if (response) {
         const responseMessage: Message = {
           id: Date.now() + Math.random().toString(),
@@ -278,7 +302,7 @@ function App() {
           )}
 
           <div className="flex-1 flex">
-            {activeTab === "admin" ? (
+            {activeTab === "ac6c2a96-060a-461c-aeaf-96a037715184" ? (
               <div className="flex-1 p-6">
                 <AdminDashboard 
                   onUploadSuccess={handleUploadSuccess}
@@ -286,7 +310,7 @@ function App() {
                   documents={documents}
                 />
               </div>
-            ) : activeTab === "faq" ? (
+            ) : activeTab === "264a51f3-f0b1-48b3-b267-1658da51b8b4" ? (
               <div className="flex-1 p-6">
                 <FAQTab />
               </div>

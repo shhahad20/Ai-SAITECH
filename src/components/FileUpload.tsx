@@ -3,6 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import { Upload, AlertCircle, Globe, Loader2 } from 'lucide-react';
 import { useNavigation } from '../lib/sections';
 import { uploadDocument } from '../lib/documents';
+import {AdminDocumentsList} from './admin/AdminDocumentsList';
 import type { Document, Section, SubSection } from '../types';
 
 interface FileUploadProps {
@@ -83,9 +84,16 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     maxFiles: 1,
     disabled: isUploading || !selectedSubSection,
   });
-
+ 
   return (
     <div className="space-y-4">
+                  <div>
+        <h2 className="text-xl font-bold mb-4">Manage Documents</h2>
+        <AdminDocumentsList
+          isAdmin={true}
+          // onEdit={handleEdit}
+        />
+      </div>
       {isAdmin && (
         <div className="space-y-3">
           {/* Section Selection */}

@@ -83,6 +83,7 @@ export interface Document {
   updated_at: string;
   section_id: string;
   category_id: string;
+  summary: string;
 }
 
 export interface DocumentCategory {
