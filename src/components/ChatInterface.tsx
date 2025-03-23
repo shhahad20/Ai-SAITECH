@@ -87,7 +87,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           await UnansweredQuestionsService.createUnansweredQuestion({
             question: userMessage.content,
             answer: message.content,
-            alternativeAnswer: message.alternativeAnswer,
+            // alternativeAnswer: message.alternativeAnswer,
             section: activeSection,
             document: activeDocument || undefined,
           });
